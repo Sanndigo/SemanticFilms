@@ -336,3 +336,4 @@ def print_results(results: List[Dict[str, Any]]) -> None:
         if poster_url:
             print(f"   Постер: {poster_url}")
     print("\n" + "=" * 70)
+

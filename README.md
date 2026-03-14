@@ -97,3 +97,4 @@ SemanticFilms/
 - `GET /api/popular` — Популярные фильмы по рейтингу
 - `GET /api/genres` — Список жанров
 - `GET /api/genre/{name}` — Фильмы по жанру
+

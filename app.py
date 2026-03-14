@@ -77,6 +77,7 @@ async def startup_event():
     init_searcher()
 
 
+
 @app.get("/", response_class=HTMLResponse)
 async def root():
     """Главная страница."""
