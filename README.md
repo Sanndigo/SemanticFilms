@@ -1,5 +1,11 @@
 # Семантический поиск фильмов
 
+[![Python 3.12](https://img.shields.io/badge/Python-3.12-blue.svg?style=for-the-badge&logo=python)](https://www.python.org/)
+[![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg?style=for-the-badge&logo=creativecommons&color=green)](LICENSE)
+[![Terms of Service](https://img.shields.io/badge/Terms-of%20Service-lightgrey.svg?style=for-the-badge)](TERMS_OF_SERVICE.md)
+
+
+
 Поиск фильмов по описанию на естественном языке с использованием sentence-transformers и FAISS.
 
 ## Возможности
