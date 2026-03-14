@@ -24,6 +24,12 @@
 pip install -r requirements.txt
 ```
 
+## Индексация
+
+```bash
+python build_index.py
+```
+
 ## Использование
 
 ### Веб-интерфейс (рекомендуется)
