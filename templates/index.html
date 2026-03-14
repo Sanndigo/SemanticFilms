@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FilmSearch — Семантический поиск фильмов</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1a1a2e',
+                        secondary: '#16213e',
+                        accent: '#e94560',
+                        card: '#0f3460'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .film-card {
+            transition: all 0.3s ease;
+        }
+        .film-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(233, 69, 96, 0.3);
+        }
+        .film-poster {
+            aspect-ratio: 2/3;
+            object-fit: cover;
+        }
+        .modal {
+            backdrop-filter: blur(8px);
+        }
+        .search-input:focus {
+            box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.3);
+        }
+        .loader {
+            border-top-color: #e94560;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-primary min-h-screen text-white">
+    <!-- Header -->
+    <header class="bg-secondary shadow-lg sticky top-0 z-40">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <svg class="w-10 h-10 text-accent" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M2 6a2 2 0 012-2h12a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zm2 0v8h12V6H4z"/>
+                    </svg>
+                    <h1 class="text-2xl font-bold text-white">FilmSearch</h1>
+                </div>
+                
+                <!-- Search Bar -->
+                <div class="flex-1 max-w-2xl w-full">
+                    <div class="relative">
+                        <input
+                            type="text"
+                            id="searchInput"
+                            placeholder="Найдите фильм по описанию..."
+                            class="search-input w-full px-6 py-3 rounded-full bg-primary border border-gray-600 focus:border-accent focus:outline-none text-white placeholder-gray-400"
+                        />
+                        <button
+                            onclick="performSearch()"
+                            class="absolute right-2 top-1/2 transform -translate-y-1/2 bg-accent hover:bg-red-600 text-white px-6 py-2 rounded-full transition-colors"
+                        >
+                            🔍
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Genre Filter -->
+                <div class="relative">
+                    <select
+                        id="genreFilter"
+                        onchange="filterByGenre()"
+                        class="px-4 py-3 rounded-lg bg-primary border border-gray-600 focus:border-accent focus:outline-none text-white cursor-pointer"
+                    >
+                        <option value="">Все жанры</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-8">
+        <!-- Results Info -->
+        <div id="resultsInfo" class="mb-6 text-gray-400"></div>
+        
+        <!-- Loading Spinner -->
+        <div id="loader" class="hidden flex justify-center items-center py-20">
+            <div class="loader ease-linear rounded-full border-4 border-t-4 border-gray-200 h-16 w-16"></div>
+        </div>
+        
+        <!-- Films Grid -->
+        <div id="filmsGrid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+            <!-- Film cards will be inserted here -->
+        </div>
+        
+        <!-- No Results -->
+        <div id="noResults" class="hidden text-center py-20">
+            <svg class="w-24 h-24 mx-auto text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z"></path>
+            </svg>
+            <p class="text-xl text-gray-400">Ничего не найдено</p>
+        </div>
+    </main>
+
+    <!-- Modal -->
+    <div id="filmModal" class="modal hidden fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
+        <div class="bg-secondary rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto relative">
+            <!-- Close Button -->
+            <button
+                onclick="closeModal()"
+                class="absolute top-4 right-4 text-gray-400 hover:text-white text-3xl z-10"
+            >
+                &times;
+            </button>
+            
+            <div id="modalContent" class="p-0">
+                <!-- Modal content will be inserted here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentFilms = [];
+        
+        // Load popular films on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadPopular();
+            loadGenres();
+            
+            // Search on Enter
+            document.getElementById('searchInput').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') performSearch();
+            });
+        });
+        
+        async function loadPopular() {
+            showLoader();
+            try {
+                const response = await fetch('/api/popular?limit=30');
+                const data = await response.json();
+                currentFilms = data.results;
+                renderFilms(currentFilms);
+                updateResultsInfo(`Популярные фильмы (${currentFilms.length})`);
+            } catch (error) {
+                console.error('Error loading popular:', error);
+                showError('Ошибка загрузки популярных фильмов');
+            }
+        }
+        
+        async function loadGenres() {
+            try {
+                const response = await fetch('/api/genres');
+                const data = await response.json();
+                const select = document.getElementById('genreFilter');
+                data.genres.forEach(genre => {
+                    const option = document.createElement('option');
+                    option.value = genre;
+                    option.textContent = genre;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading genres:', error);
+            }
+        }
+        
+        async function performSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) {
+                loadPopular();
+                return;
+            }
+            
+            showLoader();
+            try {
+                const response = await fetch('/api/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ query, top_k: 30 })
+                });
+                const data = await response.json();
+                currentFilms = data.results;
+                renderFilms(currentFilms);
+                updateResultsInfo(`Найдено фильмов: ${currentFilms.length}`);
+            } catch (error) {
+                console.error('Error searching:', error);
+                showError('Ошибка поиска');
+            }
+        }
+        
+        async function filterByGenre() {
+            const genre = document.getElementById('genreFilter').value;
+            if (!genre) {
+                loadPopular();
+                return;
+            }
+            
+            showLoader();
+            try {
+                const response = await fetch(`/api/genre/${encodeURIComponent(genre)}?limit=30`);
+                const data = await response.json();
+                currentFilms = data.results;
+                renderFilms(currentFilms);
+                updateResultsInfo(`Жанр: ${genre} (${currentFilms.length})`);
+            } catch (error) {
+                console.error('Error filtering by genre:', error);
+                showError('Ошибка фильтрации');
+            }
+        }
+        
+        function renderFilms(films) {
+            hideLoader();
+            const grid = document.getElementById('filmsGrid');
+            const noResults = document.getElementById('noResults');
+            
+            if (films.length === 0) {
+                grid.innerHTML = '';
+                noResults.classList.remove('hidden');
+                return;
+            }
+            
+            noResults.classList.add('hidden');
+            grid.innerHTML = films.map(film => `
+                <div class="film-card bg-card rounded-xl overflow-hidden cursor-pointer" onclick="openFilmModal(${film.id})">
+                    <div class="relative">
+                        <img
+                            src="${film.poster_path || 'https://via.placeholder.com/200x300?text=No+Poster'}"
+                            alt="${film.title}"
+                            class="film-poster w-full"
+                            onerror="this.src='https://via.placeholder.com/200x300?text=No+Poster'"
+                        />
+                        <div class="absolute top-2 right-2 bg-accent text-white px-2 py-1 rounded-lg text-sm font-bold">
+                            ⭐ ${film.rating.toFixed(1)}
+                        </div>
+                    </div>
+                    <div class="p-3">
+                        <h3 class="font-semibold text-sm mb-1 line-clamp-2">${film.title}</h3>
+                        <p class="text-gray-400 text-xs">${film.year}</p>
+                        <p class="text-gray-500 text-xs mt-1">${formatDuration(film.duration)}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function formatDuration(minutes) {
+            if (!minutes) return 'N/A';
+            const h = Math.floor(minutes / 60);
+            const m = minutes % 60;
+            return h > 0 ? `${h}ч ${m}мин` : `${m}мин`;
+        }
+        
+        async function openFilmModal(filmId) {
+            try {
+                const response = await fetch(`/api/film/${filmId}`);
+                const film = await response.json();
+                
+                const modal = document.getElementById('filmModal');
+                const content = document.getElementById('modalContent');
+                
+                content.innerHTML = `
+                    <div class="flex flex-col md:flex-row">
+                        <!-- Poster -->
+                        <div class="md:w-1/3">
+                            <img
+                                src="${film.poster_path || 'https://via.placeholder.com/300x450?text=No+Poster'}"
+                                alt="${film.title}"
+                                class="w-full h-auto rounded-t-2xl md:rounded-l-2xl md:rounded-tr-none"
+                                onerror="this.src='https://via.placeholder.com/300x450?text=No+Poster'"
+                            />
+                        </div>
+                        
+                        <!-- Info -->
+                        <div class="md:w-2/3 p-6">
+                            <h2 class="text-3xl font-bold mb-2">${film.title}</h2>
+                            <p class="text-gray-400 mb-4">${film.year} • ${film.countries || ''}</p>
+                            
+                            <!-- Stats -->
+                            <div class="flex flex-wrap gap-4 mb-6">
+                                <div class="bg-primary px-4 py-2 rounded-lg">
+                                    <span class="text-gray-400 text-sm">Рейтинг</span>
+                                    <p class="text-accent font-bold text-xl">⭐ ${film.rating.toFixed(1)}</p>
+                                </div>
+                                <div class="bg-primary px-4 py-2 rounded-lg">
+                                    <span class="text-gray-400 text-sm">Длительность</span>
+                                    <p class="text-white font-bold text-xl">${formatDuration(film.duration)}</p>
+                                </div>
+                                <div class="bg-primary px-4 py-2 rounded-lg">
+                                    <span class="text-gray-400 text-sm">Жанр</span>
+                                    <p class="text-white font-bold">${film.genres}</p>
+                                </div>
+                            </div>
+                            
+                            <!-- Description -->
+                            <div class="mb-6">
+                                <h3 class="text-xl font-semibold mb-2 text-accent">О фильме</h3>
+                                <p class="text-gray-300 leading-relaxed">${film.overview}</p>
+                            </div>
+                            
+                            <!-- Warning -->
+                            <div class="bg-primary/50 border-l-4 border-accent p-4 rounded">
+                                <p class="text-sm text-gray-400">
+                                    ⚠️ Информация предоставлена в ознакомительных целях. 
+                                    Для просмотра используйте легальные стриминговые сервисы.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                modal.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
+            } catch (error) {
+                console.error('Error loading film details:', error);
+                alert('Ошибка загрузки информации о фильме');
+            }
+        }
+        
+        function closeModal() {
+            document.getElementById('filmModal').classList.add('hidden');
+            document.body.style.overflow = '';
+        }
+        
+        // Close modal on outside click
+        document.getElementById('filmModal').addEventListener('click', (e) => {
+            if (e.target.id === 'filmModal') closeModal();
+        });
+        
+        // Close modal on Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+        
+        function showLoader() {
+            document.getElementById('loader').classList.remove('hidden');
+            document.getElementById('filmsGrid').classList.add('hidden');
+        }
+        
+        function hideLoader() {
+            document.getElementById('loader').classList.add('hidden');
+            document.getElementById('filmsGrid').classList.remove('hidden');
+        }
+        
+        function updateResultsInfo(text) {
+            document.getElementById('resultsInfo').textContent = text;
+        }
+        
+        function showError(message) {
+            hideLoader();
+            document.getElementById('resultsInfo').innerHTML = `<span class="text-red-500">${message}</span>`;
+        }
+    </script>
+</body>
+</html>
